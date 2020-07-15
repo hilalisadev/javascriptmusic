@@ -31,11 +31,10 @@ class TestMidiInstrument extends MidiVoice {
 
 describe("midisynth", () => {
     it("should activate and deactivate one midivoice", () => {
-      const channel = new MidiChannel();
-      midichannels[0] = channel;
-      
       const availableVoice = new TestMidiInstrument();
-      channel.voices[0] = availableVoice;
+      const channel = new MidiChannel([availableVoice]);
+
+      midichannels[0] = channel;
 
       expect<MidiVoice | null>(activeVoices[0]).toBe(null, 'should be no active voices');
       shortmessage(0x90, 69, 100);
@@ -74,12 +73,13 @@ describe("midisynth", () => {
       expect<MidiVoice | null>(activeVoices[0]).toBe(null, 'should be no active voices');
     });
     it("should keep a list of active voices without holes when adding/removing multiple voices", () => {
-      const channel = new MidiChannel();
+      const channel = new MidiChannel([
+        new TestMidiInstrument(),
+        new TestMidiInstrument(),
+        new TestMidiInstrument()
+      ]);
       midichannels[0] = channel;
       
-      channel.voices[0] = new TestMidiInstrument();
-      channel.voices[1] = new TestMidiInstrument();
-      channel.voices[2] = new TestMidiInstrument();
       expect<i32>(numActiveVoices).toBe(0);
 
       shortmessage(0x90, 69, 100);
@@ -136,5 +136,46 @@ describe("midisynth", () => {
       expect<MidiVoice | null>(activeVoices[2]).toBe(null, 'voice 3 should be inactive');
 
     });
-    
+    it("should not activate more than one voice for a note (per channel)", () => {
+      const channel = new MidiChannel([
+        new TestMidiInstrument(),
+        new TestMidiInstrument(),
+        new TestMidiInstrument()
+      ]);
+      
+      midichannels[0] = channel;
+      
+      expect<i32>(numActiveVoices).toBe(0);
+
+      shortmessage(0x90, 69, 100);
+      shortmessage(0x90, 69, 100);
+      shortmessage(0x90, 69, 100);
+
+      expect<i32>(numActiveVoices).toBe(1, 'should be only one active voice');
+      expect<MidiVoice | null>(activeVoices[0]).toBe(channel.voices[0], 'voice 1 should be active');
+      expect<MidiVoice | null>(activeVoices[1]).toBe(null, 'voice 2 should be inactive');
+      expect<MidiVoice | null>(activeVoices[2]).toBe(null, 'voice 3 should be inactive');
+
+      while (
+        (activeVoices[0] as TestMidiInstrument).env.state !== EnvelopeState.DECAY) {
+        playActiveVoices();
+      }
+      shortmessage(0x80, 69, 0);
+      expect<EnvelopeState>((activeVoices[0] as TestMidiInstrument).env.state).toBe(EnvelopeState.RELEASE);
+      expect<i32>(numActiveVoices).toBe(1, 'should be one active voice');
+      shortmessage(0x90, 69, 80);
+      expect<EnvelopeState>((activeVoices[0] as TestMidiInstrument).env.state).toBe(EnvelopeState.ATTACK);
+      while (
+        (activeVoices[0] as TestMidiInstrument).env.state !== EnvelopeState.DECAY) {
+        playActiveVoices();
+      }
+      expect<EnvelopeState>((activeVoices[0] as TestMidiInstrument).env.state).toBe(EnvelopeState.DECAY);
+      shortmessage(0x80, 69, 0);
+      while (
+        (activeVoices[0] as TestMidiInstrument).env.state !== EnvelopeState.DONE) {
+        playActiveVoices();
+      }
+      cleanupInactiveVoices();
+      expect<i32>(numActiveVoices).toBe(0, 'should be no active voices');
+    });
 });  

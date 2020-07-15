@@ -5,7 +5,11 @@ export let numActiveVoices = 0;
 export class MidiChannel {
     channel: u8;
     controllerValues: StaticArray<u8> = new StaticArray<u8>(128);
-    voices: StaticArray<MidiVoice | null> = new StaticArray<MidiVoice | null>(16); // up to 16 voices per channel
+    voices: MidiVoice[]; // provide an array of initialized voices
+
+    constructor(voices: MidiVoice[]) {
+        this.voices = voices;
+    }
 
     noteoff(note: u8): void {
         for(let n = 0; this.voices[n] !== null && n < this.voices.length; n++) {
@@ -17,14 +21,22 @@ export class MidiChannel {
         }
     }
 
-    activateVoice(): MidiVoice | null {
+    activateVoice(note: u8): MidiVoice | null {
+        for(let n = 0; n<this.voices.length; n++) {
+            const voice = this.voices[n];
+            if(voice.activeVoicesIndex > -1 && voice.note === note) {
+                return voice;
+            }
+        }
+
         if (numActiveVoices === activeVoices.length) {
             return null;
         }
+
         let activeVoiceIndex: i32 = numActiveVoices;
         
-        for(let n = 0; this.voices[n]!==null && n<this.voices.length; n++) {
-            const voice = this.voices[n] as MidiVoice;
+        for(let n = 0; n<this.voices.length; n++) {
+            const voice = this.voices[n];
             if (voice.activeVoicesIndex === -1) {
                 const availableVoice = voice as MidiVoice;
                 activeVoices[activeVoiceIndex] = availableVoice;
@@ -86,7 +98,7 @@ export function shortmessage(val1: u8, val2: u8, val3: u8): void {
     const command = val1 & 0xf0;
 
     if(command === 0x90 && val3 > 0) {
-        const activatedVoice = midichannels[channel].activateVoice();
+        const activatedVoice = midichannels[channel].activateVoice(val2);
         if(activatedVoice!==null) {
             const voice = activatedVoice as MidiVoice;
             voice.noteon(val2, val3);
