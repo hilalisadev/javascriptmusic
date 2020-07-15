@@ -1,10 +1,12 @@
-import { playActiveVoices, cleanupInactiveVoices, shortmessage, activeVoices, MidiVoice, midichannels, MidiChannel, numActiveVoices } from '../../midi/midisynth';
+import { samplebuffer, playActiveVoices, cleanupInactiveVoices, shortmessage, activeVoices, MidiVoice, midichannels, MidiChannel, numActiveVoices, fillSampleBuffer } from '../../midi/midisynth';
 import { SineOscillator } from '../../synth/sineoscillator.class';
 import { Envelope, EnvelopeState } from '../../synth/envelope.class';
 import { notefreq } from '../../synth/note';
 import { SAMPLERATE } from '../../environment';
 
 let signal: f32 = 0;
+
+midichannels[1] = midichannels[0];
 
 class TestMidiInstrument extends MidiVoice {
   osc: SineOscillator = new SineOscillator();
@@ -177,5 +179,30 @@ describe("midisynth", () => {
       }
       cleanupInactiveVoices();
       expect<i32>(numActiveVoices).toBe(0, 'should be no active voices');
+    });
+    it("should produce sound", () => {
+      fillSampleBuffer();
+      for (let n=0; n<samplebuffer.length; n++) {
+        expect<f32>(samplebuffer[n]).toBe(0);
+      }
+      shortmessage(0x91, 69, 100);
+      
+      expect<i32>(numActiveVoices).toBe(1, 'should be one active voice');
+
+      fillSampleBuffer();
+      for (let n=1; n<samplebuffer.length; n++) {
+        expect<f32>(samplebuffer[n]).not.toBe(samplebuffer[n-1], 'signal should be changing');
+      }
+
+      shortmessage(0x91, 69, 0);
+
+      while (
+        numActiveVoices > 0) {
+          fillSampleBuffer();
+      }
+      
+      for (let n=0; n<samplebuffer.length; n++) {
+        expect<f32>(samplebuffer[n]).toBe(0, 'signal should be quiet');
+      }
     });
 });  

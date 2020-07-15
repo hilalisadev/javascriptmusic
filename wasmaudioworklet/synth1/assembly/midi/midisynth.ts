@@ -1,9 +1,14 @@
+import { fillFrame } from './defaultmidisynthsetup';
+
 export const midichannels = new StaticArray<MidiChannel>(16);
 export const activeVoices = new StaticArray<MidiVoice | null>(32); // up to 32 voices playing simultaneously
 export let numActiveVoices = 0;
 
+export const sampleBufferFrames = 128;
+export const sampleBufferBytesPerChannel = sampleBufferFrames * 4;
+export const samplebuffer = new StaticArray<f32>(sampleBufferFrames * 2);
+
 export class MidiChannel {
-    channel: u8;
     controllerValues: StaticArray<u8> = new StaticArray<u8>(128);
     voices: MidiVoice[]; // provide an array of initialized voices
 
@@ -132,7 +137,18 @@ export function cleanupInactiveVoices(): void {
 }
 
 export function playActiveVoices(): void {
-    for (let n=0; activeVoices[n] !== null && n<activeVoices.length; n++) {
+    for (let n=0; n<numActiveVoices; n++) {
         (activeVoices[n] as MidiVoice).nextframe();
     }
 }
+
+export function fillSampleBuffer(): void {      
+    cleanupInactiveVoices();
+    const bufferposstart = changetype<usize>(samplebuffer);
+    const bufferposend = changetype<usize>(samplebuffer) + sampleBufferBytesPerChannel;
+    for(let bufferpos = bufferposstart; bufferpos<bufferposend; bufferpos+=4) {   
+        playActiveVoices();
+        fillFrame(bufferpos, bufferpos + sampleBufferBytesPerChannel);
+    }
+}
+  
