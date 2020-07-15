@@ -3,7 +3,8 @@
     "asbuild": "asc --runtime none assembly/index.ts -b build/index.wasm -Oz",
     "fastbuild": "asc --runtime none assembly/index.ts -b build/index.wasm -t build/index.wat",
     "createbrowsersourcebundle": "node createbrowsertsbundle.js",
-    "test": "asp"
+    "test": "asp --verbose",
+    "test:ci": "asp --summary"
   },
   "dependencies": {
     "assemblyscript": "^0.12.3"
