@@ -1,5 +1,6 @@
 export const midichannels = new StaticArray<MidiChannel>(16);
 export const activeVoices = new StaticArray<MidiVoice | null>(32); // up to 32 voices playing simultaneously
+export let numActiveVoices = 0;
 
 export class MidiChannel {
     channel: u8;
@@ -17,24 +18,18 @@ export class MidiChannel {
     }
 
     activateVoice(): MidiVoice | null {
-        let activeVoiceIndex: i32 = -1;
-        for(let n = 0; n<activeVoices.length; n++) {
-            const activeVoice = activeVoices[n];
-            if (activeVoice === null) {
-                activeVoiceIndex = n;
-                break;
-            }
-        }
-        if (activeVoiceIndex === -1) {
+        if (numActiveVoices === activeVoices.length) {
             return null;
         }
-
-        for(let n = 0; n<this.voices.length; n++) {
-            const voice = this.voices[n];
-            if (voice != null && voice.activeVoicesIndex === -1) {
+        let activeVoiceIndex: i32 = numActiveVoices;
+        
+        for(let n = 0; this.voices[n]!==null && n<this.voices.length; n++) {
+            const voice = this.voices[n] as MidiVoice;
+            if (voice.activeVoicesIndex === -1) {
                 const availableVoice = voice as MidiVoice;
                 activeVoices[activeVoiceIndex] = availableVoice;
                 availableVoice.activeVoicesIndex = activeVoiceIndex;
+                numActiveVoices++;
                 return availableVoice;
             }
         }
@@ -60,10 +55,10 @@ export abstract class MidiVoice {
     }
 
     /**
-     * Override this to trigger releases on envelopes
+     * Override this to e.g. trigger releases on envelopes
      */
     noteoff(): void {
-
+        this.velocity = 0;
     }
 
     /**
@@ -71,7 +66,11 @@ export abstract class MidiVoice {
      * 
      * Override it to add checks for e.g. envelope to be fully released
      */
-    deactivateIfDone(): void {
+    isDone(): boolean {
+        return this.velocity === 0;
+    }
+
+    deactivate(): void {
         activeVoices[this.activeVoicesIndex] = null;
         this.activeVoicesIndex = -1;
     }
@@ -100,5 +99,28 @@ export function shortmessage(val1: u8, val2: u8, val3: u8): void {
         midichannels[channel].noteoff(val2);
     } else if(command === 0xb0) {
         // control change
+    }
+}
+
+export function cleanupInactiveVoices(): void {
+    for (let n=0; n<numActiveVoices; n++) {
+        const voice = activeVoices[n] as MidiVoice;
+        if (voice.isDone()) {
+            voice.deactivate();
+            for (let r = n+1; activeVoices[r] !== null && r<activeVoices.length; r++) {
+                const nextVoice = activeVoices[r] as MidiVoice;
+                nextVoice.activeVoicesIndex--;
+                activeVoices[r-1] = nextVoice;
+                activeVoices[r] = null;
+            }
+            numActiveVoices--;
+            n--;
+        }
+    }
+}
+
+export function playActiveVoices(): void {
+    for (let n=0; activeVoices[n] !== null && n<activeVoices.length; n++) {
+        (activeVoices[n] as MidiVoice).nextframe();
     }
 }
