@@ -5,6 +5,7 @@ import { visualizeNoteOn, clearVisualization } from './visualizer/80sgrid.js';
 
 export function initAudioWorkletNode(componentRoot) {
     let audioworkletnode;
+    let onmidi;
     let playing = false;
 
     const context = new AudioContext();
@@ -26,10 +27,30 @@ export function initAudioWorkletNode(componentRoot) {
         let bytes;
 
         if(song.eventlist) {
-            await startWAM(context);
-            wamPostSong(song.eventlist, song.synthsource);
-            if (window.audioVideoRecordingEnabled === true) {
-                await startVideoRecording(context, wamsynth);        
+            if (song.synthwasm) {
+                await context.audioWorklet.addModule('./synth1/audioworklet/midisynthaudioworkletprocessor.js');
+                audioworkletnode = new AudioWorkletNode(context, 'asc-midisynth-audio-worklet-processor', {
+                    outputChannelCount: [2]
+                });
+                audioworkletnode.port.start();
+                audioworkletnode.port.postMessage({ topic: "wasm", 
+                    samplerate: context.sampleRate, 
+                    wasm: song.synthwasm, 
+                    song: song.eventlist,
+                    toggleSongPlay: componentRoot.getElementById('toggleSongPlayCheckbox').checked ? true: false
+                });
+                audioworkletnode.connect(context.destination);
+                onmidi = (data) => audioworkletnode.port.postMessage({ 
+                    midishortmsg: data
+                });
+                window.audioworkletnode = audioworkletnode;
+            } else {
+                await startWAM(context);
+                wamPostSong(song.eventlist, song.synthsource);
+                if (window.audioVideoRecordingEnabled === true) {
+                    await startVideoRecording(context, wamsynth);        
+                }
+                onmidi = wamOnMidi;
             }
         } else {
             if(song.modbytes) {
@@ -209,7 +230,7 @@ export function initAudioWorkletNode(componentRoot) {
             sendNoteToWorkletSingle(mappedChannel, note, velocity);
         }
 
-        wamOnMidi([0x90 + mappedChannel, note, velocity]);
+        onmidi([0x90 + mappedChannel, note, velocity]);
     }
 
     async function startmidi() {
@@ -228,7 +249,7 @@ export function initAudioWorkletNode(componentRoot) {
                     
                     processNoteMessage(note, velocity);
                 } else {
-                    wamOnMidi([msgType + channel, msg.data[1], msg.data[2]]);
+                    onmidi([msgType + channel, msg.data[1], msg.data[2]]);
                 }
             };
         }

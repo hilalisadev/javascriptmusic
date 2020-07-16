@@ -1,4 +1,4 @@
-import { fillFrame } from './defaultmidisynthsetup';
+import { fillFrame } from '../mixes/midi.mix';
 
 export const midichannels = new StaticArray<MidiChannel>(16);
 export const activeVoices = new StaticArray<MidiVoice | null>(32); // up to 32 voices playing simultaneously

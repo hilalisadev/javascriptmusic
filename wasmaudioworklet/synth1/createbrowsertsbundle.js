@@ -32,6 +32,7 @@ fileList.forEach(filename => {
     case 'math':
     case 'fx':
     case 'common':
+    case 'midi':
     case 'synth':
       filecontent.split(/\n/)
         .filter(line => line.startsWith('export '))

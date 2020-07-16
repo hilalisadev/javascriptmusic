@@ -45,6 +45,7 @@ async function compileWebAssemblySynth(synthsource, song, samplerate, exportmode
         console.log('successfully compiled webassembly synth');
         window.WASM_SYNTH_BYTES = result.data.binary;
         webassemblySynthUpdated = true;
+        return result.data.binary;
     } else if(result.data.downloadWASMurl) {
         const linkElement = document.createElement('a');
         linkElement.href = result.data.downloadWASMurl;
@@ -147,14 +148,18 @@ export async function initEditor(componentRoot) {
             }
         }
         
-        let songmode = 'WASM';
+        let songmode = 'midi';
         if (songsource.indexOf('SONGMODE=PROTRACKER') >= 0) {
             // special mode: we are building an amiga protracker module
             songmode = 'protracker';
-        } else if (songsource.indexOf('SONGMODE=YOSHIMI') >= 0) {
-            // special mode: yoshimi midi synth
-            songmode = 'yoshimi';
-            if( !componentRoot.querySelector('wam-preseteditor')) {
+        } else if (
+            songsource.indexOf('global.pattern_size_shift')>-1 || 
+            songsource.indexOf('global.bpm')>-1 ) {
+            songmode = 'WASM';
+            window.insertRecording = () => insertRecording4klang(insertStringIntoEditor);
+        } else {
+            const synthSourceIsXML = synthsource.startsWith('<?xml');
+            if( synthSourceIsXML && !componentRoot.querySelector('wam-preseteditor')) {
                 const presetsui = componentRoot.querySelector('#presetsui');
                 presetsui.replaceChild(document.createElement('wam-preseteditor'), presetsui.firstChild);
                 toggleEditors('assemblyscripteditor', false);
@@ -167,15 +172,21 @@ export async function initEditor(componentRoot) {
                 const eventlist = await compileMidiSong(songsource);
                 if (exportwasm) {
                     await exportWAMAudio(eventlist, synthsource);
-                }    
-                return { eventlist: eventlist, synthsource: synthsource };
+                }
+                let synthwasm = undefined;
+                if (!synthSourceIsXML) {
+                    synthwasm = await compileWebAssemblySynth(synthsource,
+                        undefined,
+                        new AudioContext().sampleRate,
+                        exportwasm                      
+                    );
+                }
+                return { eventlist: eventlist, synthsource: synthsource, synthwasm: synthwasm };
             } catch(e) {
                 errorMessagesContentElement.innerText = e;
                 errorMessagesElement.style.display = 'block';
                 throw e;
             }
-        } else {
-            window.insertRecording = () => insertRecording4klang(insertStringIntoEditor);
         }
 
         const patternToolsGlobal = createPatternToolsGlobal();

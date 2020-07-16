@@ -1,5 +1,5 @@
-import { midichannels, MidiChannel, MidiVoice } from './midisynth';
-import { StereoSignal, Freeverb, SineOscillator, Envelope, notefreq } from '../mixes/globalimports';
+import { midichannels, MidiChannel, MidiVoice } from '../midi/midisynth';
+import { StereoSignal, Freeverb, SineOscillator, Envelope, notefreq } from './globalimports';
 
 const reverb = new Freeverb();
 
