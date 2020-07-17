@@ -309,6 +309,12 @@ export async function initEditor(componentRoot) {
         try {
             const song = await compileSong();
 
+            if (song.synthwasm) {
+                audioworkletnode.port.postMessage({
+                    wasm: song.synthwasm
+                });
+            }
+
             if (song.eventlist) {
                 await wamPostSong(song.eventlist, song.synthsource);
             } else if(window.audioworkletnode) {

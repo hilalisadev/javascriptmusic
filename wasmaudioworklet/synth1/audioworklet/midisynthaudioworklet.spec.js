@@ -46,19 +46,26 @@ setBPM(100);
 
 describe('midisynth audio worklet', async function() {
     this.timeout(20000);
+
+    let appElement;
+    let analyser;
+    let audioCtx;
+    let dataArray;
+
     this.beforeAll(async () => {
         document.documentElement.appendChild(document.createElement('app-javascriptmusic'));
         await waitForAppReady();
+        appElement = document.getElementsByTagName('app-javascriptmusic')[0].shadowRoot;
     });
     this.afterAll(async () => {
         window.stopaudio();
         window.audioworkletnode = undefined;
         document.documentElement.removeChild(document.querySelector('app-javascriptmusic'));
     });
-    it('should create the midisynth', async () => {
+    it('should create the midisynth and play a note', async () => {
         songsourceeditor.doc.setValue(songsource);
         synthsourceeditor.doc.setValue(synthsource);
-        const appElement = document.getElementsByTagName('app-javascriptmusic')[0].shadowRoot;
+
         appElement.querySelector('#startaudiobutton').click();
         while (!window.audioworkletnode) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -69,22 +76,56 @@ describe('midisynth audio worklet', async function() {
         window.audioworkletnode.port.postMessage({
             midishortmsg: [0x90, 69, 100]
         });
-
         
-        const audioCtx = window.audioworkletnode.context;
-        const analyser = audioCtx.createAnalyser();
+        audioCtx = window.audioworkletnode.context;
+        analyser = audioCtx.createAnalyser();
         analyser.fftSize = 32768;
-        const  dataArray = new Float32Array(analyser.frequencyBinCount);
+        dataArray = new Float32Array(analyser.frequencyBinCount);
         window.audioworkletnode.connect(analyser);
 
         let loudestfrequency = 0;
-        while (loudestfrequency < 400) {
+        let level = -100;
+        while (loudestfrequency < 400 || level < -30) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            analyser.getFloatFrequencyData(dataArray);
+            const loudestfrequencyindex = dataArray.reduce((prev, level, ndx) => level > dataArray[prev] ? ndx: prev,0);
+            loudestfrequency = (audioCtx.sampleRate / 2) * ( (1 + loudestfrequencyindex) / dataArray.length);
+            level = dataArray[loudestfrequencyindex];
+        }
+        console.log(loudestfrequency);
+        assert.closeTo(loudestfrequency, 440, 0.1);
+    });
+    it('should hotswap the midisynth wasm binary', async () => {
+        synthsourceeditor.doc.setValue(synthsource.replace('notefreq(note)','notefreq(note+12)'));
+        appElement.querySelector('#savesongbutton').click();
+
+        let level = 0;
+        console.log('waiting for audio to stop after WASM hotswap');
+        while (level > -30) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            analyser.getFloatFrequencyData(dataArray);
+            const loudestfrequencyindex = dataArray.reduce((prev, level, ndx) => level > dataArray[prev] ? ndx: prev,0);
+            level = dataArray[loudestfrequencyindex];
+        }
+        assert.isBelow(level, -30, 'note should be stopped on WASM hotswap');
+        
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 69, 100]
+        });
+        let loudestfrequency = 440;
+
+        console.log('waiting for audio to start after WASM hotswap')
+        while (loudestfrequency < 500) {
             await new Promise(resolve => setTimeout(resolve, 200));
             analyser.getFloatFrequencyData(dataArray);
             const loudestfrequencyindex = dataArray.reduce((prev, level, ndx) => level > dataArray[prev] ? ndx: prev,0);
             loudestfrequency = (audioCtx.sampleRate / 2) * ( (1 + loudestfrequencyindex) / dataArray.length);
         }
         console.log(loudestfrequency);
-        assert.closeTo(loudestfrequency, 440, 0.1);        
+        assert.closeTo(loudestfrequency,
+            880, 0.2,
+            'Note frequency should be one octave up after WASM hotswap');
+
+        analyser.disconnect();
     });
 })
