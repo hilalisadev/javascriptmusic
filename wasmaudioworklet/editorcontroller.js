@@ -56,6 +56,7 @@ async function compileWebAssemblySynth(synthsource, song, samplerate, exportmode
     } else {
         console.log('no changes for webassembly synth');
     }
+    return null;
 }
 
 export async function initEditor(componentRoot) {
@@ -180,8 +181,10 @@ export async function initEditor(componentRoot) {
                         new AudioContext().sampleRate,
                         exportwasm                      
                     );
+                    return { eventlist: eventlist, synthwasm: synthwasm };
+                } else {
+                    return { eventlist: eventlist, synthsource: synthsource};
                 }
-                return { eventlist: eventlist, synthsource: synthsource, synthwasm: synthwasm };
             } catch(e) {
                 errorMessagesContentElement.innerText = e;
                 errorMessagesElement.style.display = 'block';
@@ -316,7 +319,14 @@ export async function initEditor(componentRoot) {
             }
 
             if (song.eventlist) {
-                await wamPostSong(song.eventlist, song.synthsource);
+                if (song.synthsource) {
+                    await wamPostSong(song.eventlist, song.synthsource);
+                } else {
+                    audioworkletnode.port.postMessage({ 
+                        sequencedata: song.eventlist,
+                        toggleSongPlay: componentRoot.getElementById('toggleSongPlayCheckbox').checked ? true: false
+                    });
+                }
             } else if(window.audioworkletnode) {
                 audioworkletnode.port.postMessage({
                     song: song,

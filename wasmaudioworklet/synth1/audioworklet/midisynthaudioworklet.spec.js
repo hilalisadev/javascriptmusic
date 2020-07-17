@@ -30,7 +30,9 @@ class SimpleSine extends MidiVoice {
 }
 
 midichannels[0] = new MidiChannel([
-    new SimpleSine()
+    new SimpleSine(),
+    new SimpleSine(),
+    new SimpleSine(),
 ]);
 
 @inline
@@ -126,6 +128,45 @@ describe('midisynth audio worklet', async function() {
             880, 0.2,
             'Note frequency should be one octave up after WASM hotswap');
 
-        analyser.disconnect();
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 69, 0]
+        });
+    });
+    it('should be able to play a sequence', async () => {
+        songsourceeditor.doc.setValue(`
+            setBPM(100);
+
+            await createTrack(0).steps(4, [
+                c6,,e6,,g6,,as6,
+                ,,,,
+            ]);
+        `);
+        appElement.querySelector('#savesongbutton').click();
+        
+        // 69 (A4) = 440 Hz
+        const noteNumberToFreq = (notenumber) => 440 * Math.pow(2, (notenumber - 69)/12);
+
+        const expectedFrequencies = [
+            noteNumberToFreq( 69 + 12 + 3 ), // c6
+            noteNumberToFreq( 69 + 12 + 3 + 4 ), // e6
+            noteNumberToFreq( 69 + 12 + 3 + 7 ), // g6
+            noteNumberToFreq( 69 + 12 + 3 + 10 ) // a#6
+        ];
+
+        while(expectedFrequencies.length > 0) {
+            let loudestfrequency = 0;
+            let loudestfrequencyindex = 0;
+            const nextExpectedFrequency = expectedFrequencies.shift();
+
+            while (loudestfrequency < nextExpectedFrequency) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                analyser.getFloatFrequencyData(dataArray);
+                loudestfrequencyindex = dataArray.reduce((prev, level, ndx) => level > dataArray[prev] ? ndx: prev,0);
+                loudestfrequency = (audioCtx.sampleRate / 2) * ( (1 + loudestfrequencyindex) / dataArray.length);
+            }
+
+            assert.closeTo(loudestfrequency, nextExpectedFrequency, 5.0, 'Expected note to have frequency close to ' + nextExpectedFrequency);
+        }
+        
     });
 })

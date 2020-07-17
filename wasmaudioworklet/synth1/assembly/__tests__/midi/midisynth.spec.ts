@@ -205,4 +205,33 @@ describe("midisynth", () => {
         expect<f32>(samplebuffer[n]).toBe(0, 'signal should be quiet');
       }
     });
+    it("should be able to turn voices on and off without waiting for release when there is only one available voice", () => {
+      const channel = new MidiChannel([
+        new TestMidiInstrument()
+      ]);
+      
+      midichannels[0] = channel;
+      shortmessage(0x90, 69, 100);
+      
+      expect<i32>(numActiveVoices).toBe(1, 'should be one active voice');
+      fillSampleBuffer();
+      fillSampleBuffer();
+      
+      shortmessage(0x90, 69, 0);
+      shortmessage(0x90, 71, 100);
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(69, 'should be the first note, since we did not wait for release');
+      fillSampleBuffer();
+      fillSampleBuffer();
+      
+      shortmessage(0x90, 71, 0);
+      shortmessage(0x90, 73, 100);
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(69, 'should still be the first note, since we did not wait for release');
+      fillSampleBuffer();
+      while (
+        (activeVoices[0] as TestMidiInstrument).env.state !== EnvelopeState.DONE) {
+        fillSampleBuffer();
+      }
+      fillSampleBuffer();
+      expect<i32>(numActiveVoices).toBe(0, 'should be no active voices after release');
+    });
 });  

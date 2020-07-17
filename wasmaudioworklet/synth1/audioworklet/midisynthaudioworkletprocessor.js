@@ -5,7 +5,7 @@ class AssemblyScriptMidiSynthAudioWorkletProcessor extends AudioWorkletProcessor
   constructor() {
     super();
     this.processorActive = true;
-
+    
     this.port.onmessage = async (msg) => {
         if(msg.data.wasm) {
           this.wasmInstancePromise = WebAssembly.instantiate(msg.data.wasm, {
@@ -15,9 +15,14 @@ class AssemblyScriptMidiSynthAudioWorkletProcessor extends AudioWorkletProcessor
             }
           });
           this.wasmInstance = (await this.wasmInstancePromise).instance.exports;
+          AudioWorkletGlobalScope.midisequencer.addMidiReceiver(this.wasmInstance.shortmessage);
         }
         
-        if(msg.data.midishortmsg) {
+        if (msg.data.sequencedata) {
+          AudioWorkletGlobalScope.midisequencer.setSequenceData(msg.data.sequencedata);
+        }
+
+        if (msg.data.midishortmsg) {
             (await this.wasmInstancePromise).instance.exports.shortmessage(
                 msg.data.midishortmsg[0],
                 msg.data.midishortmsg[1],
@@ -36,6 +41,7 @@ class AssemblyScriptMidiSynthAudioWorkletProcessor extends AudioWorkletProcessor
     const output = outputs[0];
 
     if (this.wasmInstance) {
+      AudioWorkletGlobalScope.midisequencer.onprocess();
       this.wasmInstance.fillSampleBuffer();
       output[0].set(new Float32Array(this.wasmInstance.memory.buffer,
         this.wasmInstance.samplebuffer,

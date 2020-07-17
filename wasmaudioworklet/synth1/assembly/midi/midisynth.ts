@@ -17,8 +17,8 @@ export class MidiChannel {
     }
 
     noteoff(note: u8): void {
-        for(let n = 0; this.voices[n] !== null && n < this.voices.length; n++) {
-            const voice = this.voices[n] as MidiVoice;
+        for(let n = 0; n < this.voices.length; n++) {
+            const voice = this.voices[n];
             if (voice.note === note) {
                 voice.noteoff();
                 break;

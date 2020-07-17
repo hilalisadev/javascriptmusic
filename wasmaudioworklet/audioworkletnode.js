@@ -27,16 +27,18 @@ export function initAudioWorkletNode(componentRoot) {
         let bytes;
 
         if(song.eventlist) {
+            await context.audioWorklet.addModule('./midisequencer/audioworkletprocessorsequencer.js');
+
             if (song.synthwasm) {
                 await context.audioWorklet.addModule('./synth1/audioworklet/midisynthaudioworkletprocessor.js');
                 audioworkletnode = new AudioWorkletNode(context, 'asc-midisynth-audio-worklet-processor', {
                     outputChannelCount: [2]
                 });
                 audioworkletnode.port.start();
-                audioworkletnode.port.postMessage({ topic: "wasm", 
+                audioworkletnode.port.postMessage({
                     samplerate: context.sampleRate, 
                     wasm: song.synthwasm, 
-                    song: song.eventlist,
+                    sequencedata: song.eventlist,
                     toggleSongPlay: componentRoot.getElementById('toggleSongPlayCheckbox').checked ? true: false
                 });
                 audioworkletnode.connect(context.destination);
@@ -44,7 +46,7 @@ export function initAudioWorkletNode(componentRoot) {
                     midishortmsg: data
                 });
                 window.audioworkletnode = audioworkletnode;
-            } else {
+            } else if (song.synthsource) {
                 await startWAM(context);
                 wamPostSong(song.eventlist, song.synthsource);
                 if (window.audioVideoRecordingEnabled === true) {
