@@ -183,6 +183,7 @@ export async function initEditor(componentRoot) {
                     );
                     return { eventlist: eventlist, synthwasm: synthwasm };
                 } else {
+                    window.WASM_SYNTH_BYTES = null;
                     return { eventlist: eventlist, synthsource: synthsource};
                 }
             } catch(e) {

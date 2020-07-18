@@ -29,7 +29,7 @@ export function initAudioWorkletNode(componentRoot) {
         if(song.eventlist) {
             await context.audioWorklet.addModule('./midisequencer/audioworkletprocessorsequencer.js');
 
-            if (song.synthwasm || !audioworkletnode) {
+            if (song.synthwasm || (!audioworkletnode && window.WASM_SYNTH_BYTES)) {
                 await context.audioWorklet.addModule('./synth1/audioworklet/midisynthaudioworkletprocessor.js');
                 audioworkletnode = new AudioWorkletNode(context, 'asc-midisynth-audio-worklet-processor', {
                     outputChannelCount: [2]
