@@ -138,6 +138,8 @@ describe('midisynth audio worklet', async function() {
                 c6,,e6,,g6,,as6,
                 ,,,,
             ]);
+
+            loopHere();
         `);
         appElement.querySelector('#savesongbutton').click();
         
@@ -165,6 +167,43 @@ describe('midisynth audio worklet', async function() {
 
             assert.closeTo(loudestfrequency, nextExpectedFrequency, 5.0, 'Expected note to have frequency close to ' + nextExpectedFrequency);
         }
-        
+    });
+    it('should be able to modify a sequence while playing', async () => {
+        songsourceeditor.doc.setValue(`
+            setBPM(100);
+
+            await createTrack(0).steps(4, [
+                c7,,e7,,g7,,as7,
+                ,,,,
+            ]);
+
+            loopHere();
+        `);
+        appElement.querySelector('#savesongbutton').click();
+        console.log('waiting for updated song to take effect');
+        // 69 (A4) = 440 Hz
+        const noteNumberToFreq = (notenumber) => 440 * Math.pow(2, (notenumber - 69)/12);
+
+        const expectedFrequencies = [
+            noteNumberToFreq( 69 + 12 + 12 + 3 ), // c7
+            noteNumberToFreq( 69 + 12 + 12+ 3 + 4 ), // e7
+            noteNumberToFreq( 69 + 12 + 12+ 3 + 7 ), // g7
+            noteNumberToFreq( 69 + 12 + 12+ 3 + 10 ) // a#7
+        ];
+
+        while(expectedFrequencies.length > 0) {
+            let loudestfrequency = 0;
+            let loudestfrequencyindex = 0;
+            const nextExpectedFrequency = expectedFrequencies.shift();
+
+            while (loudestfrequency < nextExpectedFrequency) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                analyser.getFloatFrequencyData(dataArray);
+                loudestfrequencyindex = dataArray.reduce((prev, level, ndx) => level > dataArray[prev] ? ndx: prev,0);
+                loudestfrequency = (audioCtx.sampleRate / 2) * ( (1 + loudestfrequencyindex) / dataArray.length);
+            }
+
+            assert.closeTo(loudestfrequency, nextExpectedFrequency, 5.0, 'Expected note to have frequency close to ' + nextExpectedFrequency);
+        }
     });
 })

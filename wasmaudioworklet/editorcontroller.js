@@ -326,6 +326,7 @@ export async function initEditor(componentRoot) {
                         sequencedata: song.eventlist,
                         toggleSongPlay: componentRoot.getElementById('toggleSongPlayCheckbox').checked ? true: false
                     });
+                    webassemblySynthUpdated = false;
                 }
             } else if(window.audioworkletnode) {
                 audioworkletnode.port.postMessage({

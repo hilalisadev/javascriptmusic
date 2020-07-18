@@ -17,7 +17,7 @@ export class MidiSequencer {
         // update sequence
         if (this.sequence.length > 0 && sequencedata.length > 0) {
             // Replace while playing
-            const currentTime = (this.currentFrame / this.sr) * 1000;
+            const currentTime = (this.currentFrame / sampleRate) * 1000;
             this.sequenceIndex = sequencedata.findIndex(evt => evt.time >= currentTime);
         } else {
             // Start playing from the beginning
