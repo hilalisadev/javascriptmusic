@@ -44,6 +44,9 @@ const songsource = `
 setBPM(100);
 `;
 
+// 69 (A4) = 440 Hz
+const noteNumberToFreq = (notenumber) => 440 * Math.pow(2, (notenumber - 69)/12);
+
 describe('midisynth audio worklet', async function() {
     this.timeout(20000);
 
@@ -92,7 +95,7 @@ describe('midisynth audio worklet', async function() {
             loudestfrequency = (audioCtx.sampleRate / 2) * ( (1 + loudestfrequencyindex) / dataArray.length);
             level = dataArray[loudestfrequencyindex];
         }
-        console.log(loudestfrequency);
+        console.log(loudestfrequency, audioCtx.sampleRate);
         assert.closeTo(loudestfrequency, 440, 0.1);
     });
     it('should hotswap the midisynth wasm binary', async () => {
@@ -181,8 +184,6 @@ describe('midisynth audio worklet', async function() {
         `);
         appElement.querySelector('#savesongbutton').click();
         console.log('waiting for updated song to take effect');
-        // 69 (A4) = 440 Hz
-        const noteNumberToFreq = (notenumber) => 440 * Math.pow(2, (notenumber - 69)/12);
 
         const expectedFrequencies = [
             noteNumberToFreq( 69 + 12 + 12 + 3 ), // c7
@@ -197,6 +198,50 @@ describe('midisynth audio worklet', async function() {
             const nextExpectedFrequency = expectedFrequencies.shift();
 
             while (loudestfrequency < nextExpectedFrequency) {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                analyser.getFloatFrequencyData(dataArray);
+                loudestfrequencyindex = dataArray.reduce((prev, level, ndx) => level > dataArray[prev] ? ndx: prev,0);
+                loudestfrequency = (audioCtx.sampleRate / 2) * ( (1 + loudestfrequencyindex) / dataArray.length);
+            }
+
+            assert.closeTo(loudestfrequency, nextExpectedFrequency, 5.0, 'Expected note to have frequency close to ' + nextExpectedFrequency);
+        }
+    });
+    it('should be able to stop and restart playing without modifying the webassembly synth', async () => {
+        appElement.querySelector('#stopaudiobutton').click();
+        console.log('waiting for audioworklet to stop');
+
+        while (window.audioworkletnode) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        appElement.querySelector('#startaudiobutton').click();
+
+        console.log('waiting for song to start playing');
+
+        while (!window.audioworkletnode) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        const expectedFrequencies = [
+            noteNumberToFreq( 69 + 12 + 12 + 3 ), // c7
+            noteNumberToFreq( 69 + 12 + 12+ 3 + 4 ), // e7
+            noteNumberToFreq( 69 + 12 + 12+ 3 + 7 ), // g7
+            noteNumberToFreq( 69 + 12 + 12+ 3 + 10 ) // a#7
+        ];
+
+        audioCtx = window.audioworkletnode.context;
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 32768;
+        dataArray = new Float32Array(analyser.frequencyBinCount);
+        window.audioworkletnode.connect(analyser);
+
+        while(expectedFrequencies.length > 0) {
+            let loudestfrequency = 0;
+            let loudestfrequencyindex = 0;
+            const nextExpectedFrequency = expectedFrequencies.shift();
+
+            console.log('expecting frequency',nextExpectedFrequency);
+            while (Math.abs(loudestfrequency - nextExpectedFrequency) > 5.0 ) {
                 await new Promise(resolve => setTimeout(resolve, 50));
                 analyser.getFloatFrequencyData(dataArray);
                 loudestfrequencyindex = dataArray.reduce((prev, level, ndx) => level > dataArray[prev] ? ndx: prev,0);

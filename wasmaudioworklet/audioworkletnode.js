@@ -29,7 +29,7 @@ export function initAudioWorkletNode(componentRoot) {
         if(song.eventlist) {
             await context.audioWorklet.addModule('./midisequencer/audioworkletprocessorsequencer.js');
 
-            if (song.synthwasm) {
+            if (song.synthwasm || !audioworkletnode) {
                 await context.audioWorklet.addModule('./synth1/audioworklet/midisynthaudioworkletprocessor.js');
                 audioworkletnode = new AudioWorkletNode(context, 'asc-midisynth-audio-worklet-processor', {
                     outputChannelCount: [2]
@@ -37,7 +37,7 @@ export function initAudioWorkletNode(componentRoot) {
                 audioworkletnode.port.start();
                 audioworkletnode.port.postMessage({
                     samplerate: context.sampleRate, 
-                    wasm: song.synthwasm, 
+                    wasm: window.WASM_SYNTH_BYTES, 
                     sequencedata: song.eventlist,
                     toggleSongPlay: componentRoot.getElementById('toggleSongPlayCheckbox').checked ? true: false
                 });
@@ -124,6 +124,7 @@ export function initAudioWorkletNode(componentRoot) {
             audioworkletnode.port.postMessage({terminate: true});
             audioworkletnode.disconnect();
             audioworkletnode = null;
+            window.audioworkletnode = null;
         }
         playing = false;
         if (wamsynth) {
