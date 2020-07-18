@@ -3,7 +3,7 @@ import { fillFrame } from '../mixes/midi.mix';
 export const midichannels = new StaticArray<MidiChannel>(16);
 export const activeVoices = new StaticArray<MidiVoice | null>(32); // up to 32 voices playing simultaneously
 export let numActiveVoices = 0;
-
+export let voiceActivationCount = 0;
 export const sampleBufferFrames = 128;
 export const sampleBufferBytesPerChannel = sampleBufferFrames * 4;
 export const samplebuffer = new StaticArray<f32>(sampleBufferFrames * 2);
@@ -30,6 +30,8 @@ export class MidiChannel {
         for(let n = 0; n<this.voices.length; n++) {
             const voice = this.voices[n];
             if(voice.activeVoicesIndex > -1 && voice.note === note) {
+                // Found already active voice for the given note
+                voice.activationCount = voiceActivationCount++;
                 return voice;
             }
         }
@@ -51,7 +53,16 @@ export class MidiChannel {
             }
         }
 
-        return null;
+        // no available voices for the current channel, we'll pick the oldest
+        let oldestVoice = this.voices[0];
+        for(let n = 1; n<this.voices.length; n++) {
+            const voice = this.voices[n];
+            if (voice.activationCount < oldestVoice.activationCount) {
+                oldestVoice = voice;
+            }
+        }
+        oldestVoice.activationCount = voiceActivationCount++;
+        return oldestVoice;
     }
 }
 
@@ -60,6 +71,7 @@ export abstract class MidiVoice {
     note: u8;
     velocity: u8;
     activeVoicesIndex: i32 = -1;
+    activationCount: i32 = (voiceActivationCount++);
 
     /**
      * If you override this (e.g. to trigger attacks on envelopes), make sure you call super.noteon

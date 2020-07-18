@@ -219,19 +219,75 @@ describe("midisynth", () => {
       
       shortmessage(0x90, 69, 0);
       shortmessage(0x90, 71, 100);
-      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(69, 'should be the first note, since we did not wait for release');
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(71, 'should be the second note');
       fillSampleBuffer();
       fillSampleBuffer();
       
       shortmessage(0x90, 71, 0);
       shortmessage(0x90, 73, 100);
-      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(69, 'should still be the first note, since we did not wait for release');
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(73, 'should still be the third note');
+      
       fillSampleBuffer();
+      shortmessage(0x90, 73, 0);
       while (
         (activeVoices[0] as TestMidiInstrument).env.state !== EnvelopeState.DONE) {
         fillSampleBuffer();
       }
       fillSampleBuffer();
       expect<i32>(numActiveVoices).toBe(0, 'should be no active voices after release');
+    });
+    it("should take over the oldest voice if all voices for a channel are active", () => {
+      const channel = new MidiChannel([
+        new TestMidiInstrument(),
+        new TestMidiInstrument(),
+        new TestMidiInstrument()
+      ]);
+      
+      midichannels[0] = channel;
+      shortmessage(0x90, 69, 100);
+      
+      expect<i32>(numActiveVoices).toBe(1, 'should be one active voice');
+      fillSampleBuffer();
+      fillSampleBuffer();
+      
+      
+      shortmessage(0x90, 71, 100);
+      expect<i32>(numActiveVoices).toBe(2, 'should be two active voices');
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(69, 'voice 1 should be the first note');
+      expect<u8>((activeVoices[1] as MidiVoice).note).toBe(71, 'voice 2 should be the second note');
+      fillSampleBuffer();
+      
+      
+      shortmessage(0x90, 73, 100);
+      expect<i32>(numActiveVoices).toBe(3, 'should be three active voices');
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(69, 'voice 1 should be the first note');
+      expect<u8>((activeVoices[1] as MidiVoice).note).toBe(71, 'voice 2 should be the second note');
+      expect<u8>((activeVoices[2] as MidiVoice).note).toBe(73, 'voice 3 should be the third note');
+      fillSampleBuffer();
+      
+      shortmessage(0x90, 75, 100);
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(75, 'voice 1 should be the fourth note');
+      expect<u8>((activeVoices[1] as MidiVoice).note).toBe(71, 'voice 2 should be the second note');
+      expect<u8>((activeVoices[2] as MidiVoice).note).toBe(73, 'voice 3 should be the third note');
+      fillSampleBuffer();
+      
+      shortmessage(0x90, 77, 100);
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(75, 'voice 1 should be the fourth note');
+      expect<u8>((activeVoices[1] as MidiVoice).note).toBe(77, 'voice 2 should be the fifth note');
+      expect<u8>((activeVoices[2] as MidiVoice).note).toBe(73, 'voice 3 should be the second note');
+      fillSampleBuffer();
+      
+      shortmessage(0x90, 79, 100);
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(75, 'voice 1 should be the fourth note');
+      expect<u8>((activeVoices[1] as MidiVoice).note).toBe(77, 'voice 2 should be the fifth note');
+      expect<u8>((activeVoices[2] as MidiVoice).note).toBe(79, 'voice 3 should be the sixth note');
+      fillSampleBuffer();
+      
+      shortmessage(0x90, 81, 100);
+      expect<u8>((activeVoices[0] as MidiVoice).note).toBe(81, 'voice 1 should be the seventh note');
+      expect<u8>((activeVoices[1] as MidiVoice).note).toBe(77, 'voice 2 should be the fifth note');
+      expect<u8>((activeVoices[2] as MidiVoice).note).toBe(79, 'voice 3 should be the sixth note');
+      fillSampleBuffer();
+      
     });
 });  

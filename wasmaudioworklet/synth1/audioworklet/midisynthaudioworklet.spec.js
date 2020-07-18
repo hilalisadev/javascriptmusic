@@ -30,9 +30,7 @@ class SimpleSine extends MidiVoice {
 }
 
 midichannels[0] = new MidiChannel([
-    new SimpleSine(),
-    new SimpleSine(),
-    new SimpleSine(),
+    new SimpleSine()
 ]);
 
 @inline

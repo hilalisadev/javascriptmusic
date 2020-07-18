@@ -36,6 +36,7 @@ export { cos } from '../math/sin';
 export { midichannels } from '../midi/midisynth';
 export { activeVoices } from '../midi/midisynth';
 export { numActiveVoices } from '../midi/midisynth';
+export { voiceActivationCount } from '../midi/midisynth';
 export { sampleBufferFrames } from '../midi/midisynth';
 export { sampleBufferBytesPerChannel } from '../midi/midisynth';
 export { samplebuffer } from '../midi/midisynth';
