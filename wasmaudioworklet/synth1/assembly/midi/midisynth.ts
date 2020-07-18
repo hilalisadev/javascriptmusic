@@ -7,6 +7,8 @@ export let voiceActivationCount = 0;
 export const sampleBufferFrames = 128;
 export const sampleBufferBytesPerChannel = sampleBufferFrames * 4;
 export const samplebuffer = new StaticArray<f32>(sampleBufferFrames * 2);
+const bufferposstart = changetype<usize>(samplebuffer);
+const bufferposend = changetype<usize>(samplebuffer) + sampleBufferBytesPerChannel;
 
 export class MidiChannel {
     controllerValues: StaticArray<u8> = new StaticArray<u8>(128);
@@ -156,8 +158,7 @@ export function playActiveVoices(): void {
 
 export function fillSampleBuffer(): void {      
     cleanupInactiveVoices();
-    const bufferposstart = changetype<usize>(samplebuffer);
-    const bufferposend = changetype<usize>(samplebuffer) + sampleBufferBytesPerChannel;
+    
     for(let bufferpos = bufferposstart; bufferpos<bufferposend; bufferpos+=4) {   
         playActiveVoices();
         fillFrame(bufferpos, bufferpos + sampleBufferBytesPerChannel);

@@ -31,6 +31,29 @@ class TestMidiInstrument extends MidiVoice {
   }
 }
 
+class LongReleaseInstrument extends MidiVoice {
+  osc: SineOscillator = new SineOscillator();
+  env: Envelope = new Envelope(0.05, 0.0, 1.0, 10.0);
+
+  noteon(note: u8, velocity: u8): void {
+    super.noteon(note, velocity);
+    this.osc.frequency = notefreq(note);
+    this.env.attack();
+  }
+
+  noteoff(): void {
+    this.env.release();
+  }
+
+  isDone(): boolean {
+    return this.env.isDone();
+  }
+
+  nextframe(): void {
+    signal = this.osc.next() * this.env.next() * this.velocity / 256;        
+  }
+}
+
 describe("midisynth", () => {
     it("should activate and deactivate one midivoice", () => {
       const availableVoice = new TestMidiInstrument();
@@ -257,7 +280,6 @@ describe("midisynth", () => {
       expect<u8>((activeVoices[1] as MidiVoice).note).toBe(71, 'voice 2 should be the second note');
       fillSampleBuffer();
       
-      
       shortmessage(0x90, 73, 100);
       expect<i32>(numActiveVoices).toBe(3, 'should be three active voices');
       expect<u8>((activeVoices[0] as MidiVoice).note).toBe(69, 'voice 1 should be the first note');
@@ -289,5 +311,44 @@ describe("midisynth", () => {
       expect<u8>((activeVoices[2] as MidiVoice).note).toBe(79, 'voice 3 should be the sixth note');
       fillSampleBuffer();
       
+      shortmessage(0x90, 81, 0);
+      shortmessage(0x90, 77, 0);
+      shortmessage(0x90, 79, 0);
+
+      while (
+        (activeVoices[0] as TestMidiInstrument).env.state !== EnvelopeState.DONE) {
+        fillSampleBuffer();
+      }
+      fillSampleBuffer();
+      expect<i32>(numActiveVoices).toBe(0, 'should be no active voices after release');
+    });
+    it("should play all the notes being passed to a long release instrument", () => {      
+      midichannels[0] = new MidiChannel([
+        new LongReleaseInstrument(),
+        new LongReleaseInstrument()
+      ]);
+
+      for (let n=1; n < 126; n++) {
+        const note: u8 = n as u8;
+        
+        shortmessage(0x90, note, 100);
+        let noteVoice: LongReleaseInstrument;
+
+        for (let voiceIndex=0; voiceIndex < numActiveVoices; voiceIndex++) {
+          if ((activeVoices[voiceIndex] as MidiVoice).note === note) {
+            noteVoice = activeVoices[voiceIndex] as LongReleaseInstrument;
+          }
+        }
+
+        expect<EnvelopeState>(noteVoice.env.state).toBe(EnvelopeState.ATTACK, 'expected note to be triggered');
+        
+        while (noteVoice.env.state === EnvelopeState.ATTACK) {
+          fillSampleBuffer();
+        }
+        
+        shortmessage(0x80, note, 0);
+        fillSampleBuffer();
+        expect<EnvelopeState>(noteVoice.env.state).toBe(EnvelopeState.RELEASE, 'expected note to be released');
+      }
     });
 });  

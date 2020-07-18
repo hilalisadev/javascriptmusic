@@ -4,6 +4,9 @@
 const fs = require('fs');
 
 function walkSync(dir, filelist) {
+  if (dir.indexOf('__tests__') > -1) {
+    return [];
+  }
   const files = fs.readdirSync(dir);
   
   filelist = filelist || [];
