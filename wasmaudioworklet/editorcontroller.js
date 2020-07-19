@@ -1,5 +1,5 @@
 import { loadScript, loadCSS } from './common/scriptloader.js';
-import { compileSong as compileMidiSong } from './midisequencer/songcompiler.js';
+import { compileSong as compileMidiSong, instrumentNames as midiInstrumentNames } from './midisequencer/songcompiler.js';
 import { insertMidiRecording } from './midisequencer/editorfunctions.js';
 import { postSong as wamPostSong, exportWAMAudio } from './webaudiomodules/wammanager.js';
 import { insertRecording as insertRecording4klang } from './4klangsequencer/editorfunctions.js';
@@ -171,16 +171,21 @@ export async function initEditor(componentRoot) {
             window.insertRecording = () => insertMidiRecording(insertStringIntoEditor);
             try {
                 const eventlist = await compileMidiSong(songsource);
+                if ( midiInstrumentNames.length > 0 ) {
+                    setInstrumentNames(midiInstrumentNames);
+                }
                 if (exportwasm) {
                     await exportWAMAudio(eventlist, synthsource);
                 }
                 let synthwasm = undefined;
                 if (!synthSourceIsXML) {
+                    toggleSpinner(true);
                     synthwasm = await compileWebAssemblySynth(synthsource,
                         undefined,
                         new AudioContext().sampleRate,
                         exportwasm                      
                     );
+                    toggleSpinner(false);
                     return { eventlist: eventlist, synthwasm: synthwasm };
                 } else {
                     window.WASM_SYNTH_BYTES = null;
