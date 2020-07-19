@@ -36,6 +36,15 @@ class AssemblyScriptMidiSynthAudioWorkletProcessor extends AudioWorkletProcessor
                 msg.data.midishortmsg[1],
                 msg.data.midishortmsg[2]
             );
+            AudioWorkletGlobalScope.midisequencer.onmidi(msg.data.midishortmsg);
+        }
+
+        if (msg.data.recorded) {
+          this.port.postMessage({ 'recorded':  AudioWorkletGlobalScope.midisequencer.getRecorded() });
+        }
+        
+        if (msg.data.currentTime) {
+          this.port.postMessage({ currentTime:  AudioWorkletGlobalScope.midisequencer.getCurrentTime()});
         }
 
         if (msg.data.terminate) {

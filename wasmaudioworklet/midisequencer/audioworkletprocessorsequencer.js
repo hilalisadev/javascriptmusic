@@ -31,8 +31,31 @@ export class MidiSequencer {
         this.midireceiver = midireceiver;
     }
 
+    onmidi(data) {
+      if (this.recordingActive) {
+        if (!this.recorded[this.currentFrame]) {
+          this.recorded[this.currentFrame] = [];
+        }
+        this.recorded[this.currentFrame].push([data[0], data[1], data[2]]);
+      }
+    }
+
+    getRecorded() {
+      const eventlist = Object.keys(this.recorded)
+                    .sort((a, b) => a - b)
+                    .reduce((prev, frame) =>
+              prev.concat(this.recorded[frame].map(event =>
+                [frame / sampleRate].concat(event)))
+              , []);
+      return eventlist;
+    }
+
+    getCurrentTime() {
+      return (this.currentFrame / sampleRate) * 1000;
+    }
+
     onprocess() {
-        let currentTime = (this.currentFrame / sampleRate) * 1000;
+        let currentTime = this.getCurrentTime();
 
         while (this.sequenceIndex < this.sequence.length &&
             this.sequence[this.sequenceIndex] && // sometimes this is undefined for yet unkown reasons

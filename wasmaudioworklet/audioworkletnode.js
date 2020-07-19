@@ -1,5 +1,6 @@
 import { stopVideoRecording, startVideoRecording } from './screenrecorder/screenrecorder.js';
 import { startWAM, postSong as wamPostSong, pauseWAMSong, onMidi as wamOnMidi, wamsynth, resumeWAMSong } from './webaudiomodules/wammanager.js';
+import { createAudioWorklet as createMidiSynthAudioWorklet, onmidi as midiSynthOnMidi } from './synth1/audioworklet/midisynthaudioworklet.js';
 import { visualizeNoteOn, clearVisualization } from './visualizer/80sgrid.js';
 // The code in the main global scope.
 
@@ -29,23 +30,14 @@ export function initAudioWorkletNode(componentRoot) {
         if(song.eventlist) {
             await context.audioWorklet.addModule('./midisequencer/audioworkletprocessorsequencer.js');
 
-            if (song.synthwasm || (!audioworkletnode && window.WASM_SYNTH_BYTES)) {
-                await context.audioWorklet.addModule('./synth1/audioworklet/midisynthaudioworkletprocessor.js');
-                audioworkletnode = new AudioWorkletNode(context, 'asc-midisynth-audio-worklet-processor', {
-                    outputChannelCount: [2]
-                });
-                audioworkletnode.port.start();
-                audioworkletnode.port.postMessage({
-                    samplerate: context.sampleRate, 
-                    wasm: window.WASM_SYNTH_BYTES, 
-                    sequencedata: song.eventlist,
-                    toggleSongPlay: componentRoot.getElementById('toggleSongPlayCheckbox').checked ? true: false
-                });
-                audioworkletnode.connect(context.destination);
-                onmidi = (data) => audioworkletnode.port.postMessage({ 
-                    midishortmsg: data
-                });
+            if (song.synthwasm || (!audioworkletnode && window.WASM_SYNTH_BYTES)) {                
+                audioworkletnode = await createMidiSynthAudioWorklet(context,
+                        window.WASM_SYNTH_BYTES,
+                        song.eventlist,
+                        componentRoot.getElementById('toggleSongPlayCheckbox').checked ? true: false
+                    );
                 window.audioworkletnode = audioworkletnode;
+                onmidi = midiSynthOnMidi;
             } else if (song.synthsource) {
                 await startWAM(context);
                 wamPostSong(song.eventlist, song.synthsource);
@@ -91,7 +83,7 @@ export function initAudioWorkletNode(componentRoot) {
                 const activenotes = new Array(song.instrumentPatternLists.length).fill(0);
                 
                 audioworkletnode.port.onmessage = msg => {
-                    if(msg.data.channelvalues) {
+                    if (msg.data.channelvalues) {
                         const channelvalues = msg.data.channelvalues;
                         for(let n=0;n<channelvalues.length;n++) {
                             const note = channelvalues[n];            
@@ -105,7 +97,7 @@ export function initAudioWorkletNode(componentRoot) {
                             }            
                         };
                     }
-                    if(msg.data.patternData) {
+                    if (msg.data.patternData) {
                         window.recordedSongData.patterns[msg.data.recordedPatternNo - 1] = msg.data.patternData;
                         window.recordedSongData.instrumentPatternLists[msg.data.channel][msg.data.instrumentPatternIndex] =
                                         msg.data.recordedPatternNo;

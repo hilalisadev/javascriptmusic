@@ -1,5 +1,6 @@
 import { waitForAppReady } from '../../app.js';
 import { songsourceeditor, synthsourceeditor } from '../../editorcontroller.js';
+import { getCurrentTime } from './midisynthaudioworklet.js';
 
 const synthsource = `
 import { midichannels, MidiChannel, MidiVoice , SineOscillator, Envelope, notefreq } from './globalimports';
@@ -250,5 +251,67 @@ describe('midisynth audio worklet', async function() {
 
             assert.closeTo(loudestfrequency, nextExpectedFrequency, 5.0, 'Expected note to have frequency close to ' + nextExpectedFrequency);
         }
+    });
+    it('should record midi', async () => {
+        songsourceeditor.doc.setValue(`
+            setBPM(120);
+
+            startRecording();
+            await createTrack(0,1).steps(4, [
+                c3,,,,
+                e3,,,,
+                g3,,,,
+                e3,,,,
+            ]);
+            stopRecording();
+            loopHere();
+        `);
+        appElement.querySelector('#savesongbutton').click();
+        
+        const firstTimeStamp = await getCurrentTime();
+        let currentTime = firstTimeStamp;
+        do {
+            await new Promise(resolve => setTimeout(resolve,20));
+            currentTime = await getCurrentTime();
+            console.log('waiting for loop', currentTime);
+        } while (currentTime >= firstTimeStamp);
+
+        console.log('sending midi events');
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 69, 91]
+        });
+        await new Promise(resolve => setTimeout(resolve,500));
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 69, 0]
+        });
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 72, 92]
+        });
+        await new Promise(resolve => setTimeout(resolve,500));
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 72, 0]
+        });
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 76, 93]
+        });
+        await new Promise(resolve => setTimeout(resolve,500));
+        window.audioworkletnode.port.postMessage({
+            midishortmsg: [0x90, 76, 0]
+        });
+        
+        await new Promise(resolve => setTimeout(resolve,500));
+
+        window.insertRecording();
+        
+        let songsource;
+        do {
+            songsource = songsourceeditor.doc.getValue();
+            console.log(songsource);
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } while (songsource.indexOf('createTrack(0).play(') === -1)
+
+        assert.isTrue(songsource.indexOf('a5(') > -1);
+        assert.isTrue(songsource.indexOf('c6(') > -1);
+        assert.isTrue(songsource.indexOf('e6(') > -1);
     });
 })
