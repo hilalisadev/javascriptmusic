@@ -352,12 +352,12 @@ describe("midisynth", () => {
         expect<EnvelopeState>(noteVoice.env.state).toBe(EnvelopeState.RELEASE, 'expected note to be released');
       }
     });
-    it("should deactivateall voices after all notes off", () => {
+    it("should deactivate all voices after all notes off", () => {
       midichannels[0] = new MidiChannel(createInstrumentArray<MidiVoice>(60, () => new LongReleaseInstrument()));
 
       for (let n=1; n < 127; n++) {
         const note: u8 = n as u8;
-        
+
         shortmessage(0x90, note, 100);        
       }
       expect<i32>(numActiveVoices).toBe(activeVoices.length, 'all voices should be active');
@@ -370,5 +370,47 @@ describe("midisynth", () => {
       }
       
       expect<i32>(numActiveVoices).toBe(0, 'all voices should be deactivated after release');
+    });
+    it("should sustain notes on a channel", () => {
+      midichannels[0] = new MidiChannel(createInstrumentArray<MidiVoice>(20, () => new TestMidiInstrument()));
+
+      for (let n=1; n < 11; n++) {
+        const note: u8 = n as u8;        
+        shortmessage(0x90, note, 100);
+      }
+      fillSampleBuffer();
+      shortmessage(0xb0, 64, 127); // sustain control change
+
+      expect<i32>(numActiveVoices).toBe(10, 'should be active voices');
+      expect<u8>(midichannels[0].controllerValues[64]).toBe(127);
+
+      fillSampleBuffer();
+
+      for (let n=1; n < 11; n++) {
+        const note: u8 = n as u8;        
+        shortmessage(0x90, note, 0); // all notes off
+      }
+
+      fillSampleBuffer();
+
+      for (let n=0; n < numActiveVoices; n++) {
+        expect<EnvelopeState>((activeVoices[n] as TestMidiInstrument).env.state)
+                .not.toBe(EnvelopeState.RELEASE, 'notes should not be in release');
+      }
+
+      fillSampleBuffer();
+      expect<i32>(midichannels[0].sustainedVoicesIndex).toBe(10);
+      expect<MidiVoice | null>(midichannels[0].sustainedVoices[0]).not.toBe(null);
+      shortmessage(0xb0, 64, 0); // release all held by sustain
+      expect<u8>(midichannels[0].controllerValues[64]).toBe(0);
+      expect<MidiVoice | null>(midichannels[0].sustainedVoices[0]).toBe(null);
+
+      expect<i32>(numActiveVoices).toBe(10, 'should be active voices');
+      
+      for (let n=0; n < numActiveVoices; n++) {
+        expect<EnvelopeState>((activeVoices[n] as TestMidiInstrument).env.state)
+                .toBe(EnvelopeState.RELEASE, 'notes should be in release');
+      }
+
     });
 });  

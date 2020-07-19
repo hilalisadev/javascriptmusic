@@ -1,7 +1,10 @@
 import { fillFrame } from '../mixes/midi.mix';
 
+const MAX_ACTIVE_VOICES_SHIFT = 5; // up to 32 voices playing simultaneously
+const MAX_ACTIVE_VOICES = 1 << MAX_ACTIVE_VOICES_SHIFT;
+
 export const midichannels = new StaticArray<MidiChannel>(16);
-export const activeVoices = new StaticArray<MidiVoice | null>(32); // up to 32 voices playing simultaneously
+export const activeVoices = new StaticArray<MidiVoice | null>(MAX_ACTIVE_VOICES);
 export let numActiveVoices = 0;
 export let voiceActivationCount = 0;
 export const sampleBufferFrames = 128;
@@ -10,19 +13,46 @@ export const samplebuffer = new StaticArray<f32>(sampleBufferFrames * 2);
 const bufferposstart = changetype<usize>(samplebuffer);
 const bufferposend = changetype<usize>(samplebuffer) + sampleBufferBytesPerChannel;
 
+const CONTROL_SUSTAIN: u8 = 64;
+
 export class MidiChannel {
     controllerValues: StaticArray<u8> = new StaticArray<u8>(128);
     voices: MidiVoice[]; // provide an array of initialized voices
+    sustainedVoices: StaticArray<MidiVoice | null> = new StaticArray<MidiVoice | null>(MAX_ACTIVE_VOICES);
+    sustainedVoicesIndex: i32 = 0;
 
     constructor(voices: MidiVoice[]) {
         this.voices = voices;
+    }
+
+    controlchange(controller: u8, value: u8): void {
+        this.controllerValues[controller] = value;
+
+        switch (controller) {
+            case CONTROL_SUSTAIN:
+                // sustain
+                if (value < 64) {
+                    for (let n = 0; n<MAX_ACTIVE_VOICES; n++) {
+                        if (this.sustainedVoices[n] != null) {
+                            (this.sustainedVoices[n] as MidiVoice).noteoff();
+                            this.sustainedVoices[n] = null;
+                        }
+                    }
+                }
+                break;
+        }
     }
 
     noteoff(note: u8): void {
         for(let n = 0; n < this.voices.length; n++) {
             const voice = this.voices[n];
             if (voice.note === note) {
-                voice.noteoff();
+                if (this.controllerValues[CONTROL_SUSTAIN] >= 64 ) {
+                    this.sustainedVoices[this.sustainedVoicesIndex++] = voice;
+                    this.sustainedVoicesIndex &= ((1 << MAX_ACTIVE_VOICES_SHIFT) - 1);
+                } else {
+                    voice.noteoff();
+                }
                 break;
             }
         }
@@ -130,6 +160,7 @@ export function shortmessage(val1: u8, val2: u8, val3: u8): void {
         midichannels[channel].noteoff(val2);
     } else if(command === 0xb0) {
         // control change
+        midichannels[channel].controlchange(val2, val3);
     }
 }
 
