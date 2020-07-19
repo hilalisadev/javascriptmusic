@@ -133,12 +133,19 @@ export function shortmessage(val1: u8, val2: u8, val3: u8): void {
     }
 }
 
+export function allNotesOff(): void {
+    for (let n=0; n<numActiveVoices; n++) {
+        const voice = activeVoices[n] as MidiVoice;
+        voice.noteoff();
+    }
+}
+
 export function cleanupInactiveVoices(): void {
     for (let n=0; n<numActiveVoices; n++) {
         const voice = activeVoices[n] as MidiVoice;
         if (voice.isDone()) {
             voice.deactivate();
-            for (let r = n+1; activeVoices[r] !== null && r<activeVoices.length; r++) {
+            for (let r = n+1; r < numActiveVoices; r++) {
                 const nextVoice = activeVoices[r] as MidiVoice;
                 nextVoice.activeVoicesIndex--;
                 activeVoices[r-1] = nextVoice;

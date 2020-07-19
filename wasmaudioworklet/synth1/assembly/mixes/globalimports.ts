@@ -43,6 +43,7 @@ export { samplebuffer } from '../midi/midisynth';
 export { MidiChannel } from '../midi/midisynth';
 export { MidiVoice } from '../midi/midisynth';
 export { shortmessage } from '../midi/midisynth';
+export { allNotesOff } from '../midi/midisynth';
 export { cleanupInactiveVoices } from '../midi/midisynth';
 export { playActiveVoices } from '../midi/midisynth';
 export { fillSampleBuffer } from '../midi/midisynth';

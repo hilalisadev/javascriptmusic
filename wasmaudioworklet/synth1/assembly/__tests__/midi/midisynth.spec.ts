@@ -1,8 +1,9 @@
-import { samplebuffer, playActiveVoices, cleanupInactiveVoices, shortmessage, activeVoices, MidiVoice, midichannels, MidiChannel, numActiveVoices, fillSampleBuffer } from '../../midi/midisynth';
+import { samplebuffer, playActiveVoices, cleanupInactiveVoices, shortmessage, activeVoices, MidiVoice, midichannels, MidiChannel, numActiveVoices, fillSampleBuffer, allNotesOff } from '../../midi/midisynth';
 import { SineOscillator } from '../../synth/sineoscillator.class';
 import { Envelope, EnvelopeState } from '../../synth/envelope.class';
 import { notefreq } from '../../synth/note';
 import { SAMPLERATE } from '../../environment';
+import { createInstrumentArray } from '../../common/mixcommon';
 
 let signal: f32 = 0;
 
@@ -350,5 +351,24 @@ describe("midisynth", () => {
         fillSampleBuffer();
         expect<EnvelopeState>(noteVoice.env.state).toBe(EnvelopeState.RELEASE, 'expected note to be released');
       }
+    });
+    it("should deactivateall voices after all notes off", () => {
+      midichannels[0] = new MidiChannel(createInstrumentArray<MidiVoice>(60, () => new LongReleaseInstrument()));
+
+      for (let n=1; n < 127; n++) {
+        const note: u8 = n as u8;
+        
+        shortmessage(0x90, note, 100);        
+      }
+      expect<i32>(numActiveVoices).toBe(activeVoices.length, 'all voices should be active');
+
+      allNotesOff();
+      expect<i32>(numActiveVoices).toBe(activeVoices.length, 'all voices should be active before release');
+
+      while (numActiveVoices > 0) {
+        fillSampleBuffer();
+      }
+      
+      expect<i32>(numActiveVoices).toBe(0, 'all voices should be deactivated after release');
     });
 });  
